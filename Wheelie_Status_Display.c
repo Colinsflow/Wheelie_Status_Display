@@ -283,7 +283,12 @@ void loop() {
   
   // Determine bar colors and handle overflow
   uint16_t mainBarColor;
-  if (abs(pitch) >= 80) {
+  if (pitch > 0) {
+    // Red bar for positive pitch (on the ground)
+    mainBarColor = ST77XX_RED;
+    mainFillHeight = map(constrain(pitch, 0, maxPitch), 0, maxPitch, 0, barHeight);
+    mainFillY = centerY + barHeight/2 - mainFillHeight;
+  } else if (abs(pitch) >= 80) {
     mainBarColor = ST77XX_RED;
   } else if (abs(pitch) >= 60) {
     mainBarColor = ST77XX_YELLOW;
@@ -314,15 +319,18 @@ void loop() {
   tft_ST7735.drawRect(secondBarX, centerY - barHeight/2, secondBarWidth, barHeight, ST77XX_WHITE);
   
   // Display pitch value
-  tft_ST7735.fillRect(0, 0, 60, 20, ST77XX_BLACK);
-  tft_ST7735.setCursor(0, 0);
+  tft_ST7735.fillRect(10, 4, 60, 20, ST77XX_BLACK);  // Moved 10 pixels right and 2 pixels down
+  tft_ST7735.setCursor(10, 4);  // Moved 10 pixels right and 2 pixels down
   tft_ST7735.setTextColor(ST77XX_WHITE);
   tft_ST7735.setTextSize(2);
-  int displayPitch = abs(round(pitch));
-  if (displayPitch < 10) {
+  int displayPitch = round(pitch * -1); // Multiply by -1 to swap the sign
+  if (abs(displayPitch) < 10) {
     tft_ST7735.print(" "); // Add a space for single-digit numbers
   }
-  tft_ST7735.print(displayPitch);
+  if (displayPitch < 0) {
+    tft_ST7735.print("-");
+  }
+  tft_ST7735.print(abs(displayPitch));
   tft_ST7735.print((char)247); // Degree symbol
 
   // Handle 80-degree timer
@@ -340,8 +348,8 @@ void loop() {
     updateTopTimes(currentTime);
   }
 
-  // Handle wheelie timer (>10 degrees)
-  if (abs(pitch) > 10) {
+  // Handle wheelie timer (pitch < -10 degrees)
+  if (pitch < -10) {
     if (!isWheelieTimerRunning) {
       wheelieStartTime = millis();
       isWheelieTimerRunning = true;

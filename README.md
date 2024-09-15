@@ -36,7 +36,7 @@ A device that tracks and displays real-time wheelie metrics for bike enthusiasts
 
 ## Usage
 
-Mount the device securely on your motorcycle. Power on to start tracking your wheelie performance. The display provides immediate feedback during your ride.
+Mount the device securely on your bike. Power on to start tracking your wheelie performance. The display provides immediate feedback during your ride.
 
 ## Safety Notice
 

@@ -1,6 +1,6 @@
 # Wheelie Leveler
 
-A device that tracks and displays real-time wheelie metrics for motorcycle enthusiasts.
+A device that tracks and displays real-time wheelie metrics for bike enthusiasts.
 
 ## Features
 

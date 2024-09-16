@@ -135,7 +135,13 @@ String formatTime(float seconds) {
   
   char buffer[20];
   if (minutes > 0) {
-    sprintf(buffer, "%d:%02d.%02d", minutes, secs, millis);
+    if (seconds >= 600) { // 10 minutes or more
+      sprintf(buffer, "%d:%02d", minutes, secs);
+    } else {
+      sprintf(buffer, "%d:%02d.%02d", minutes, secs, millis);
+    }
+  } else if (seconds >= 10) {
+    sprintf(buffer, "%d.%02d", secs, millis);
   } else {
     sprintf(buffer, "%d.%02d", secs, millis);
   }
@@ -143,7 +149,7 @@ String formatTime(float seconds) {
 }
 
 // Update this helper function to right-align text
-void printRightAligned(float value, int x, int y, int width, uint16_t color) {
+void printRightAligned(float value, int y, uint16_t color) {
   tft_ST7735.setTextColor(color);
   tft_ST7735.setTextSize(2);
   
@@ -154,9 +160,15 @@ void printRightAligned(float value, int x, int y, int width, uint16_t color) {
   uint16_t w, h;
   tft_ST7735.getTextBounds(timeStr.c_str(), 0, 0, &x1, &y1, &w, &h);
   
-  // Clear the area and print the text right-aligned
-  tft_ST7735.fillRect(x, y, width, h, ST77XX_BLACK);
-  tft_ST7735.setCursor(x + width - w, y);
+  // Add some padding to the width
+  int clearWidth = w + 10;  // 5 pixels padding on each side
+  
+  // Clear only the area needed for the current number
+  int clearX = tft_ST7735.width() - clearWidth;
+  tft_ST7735.fillRect(clearX, y, clearWidth, h + 4, ST77XX_BLACK);
+  
+  // Print the text right-aligned within the cleared area
+  tft_ST7735.setCursor(tft_ST7735.width() - 5 - w, y + 2);  // 5 pixels padding on the right
   tft_ST7735.print(timeStr);
 }
 
@@ -202,6 +214,10 @@ void updateTopWheelieTimes(float newTime) {
     tft_ST7735.setCursor(tft_ST7735.width() - w - 5, 90 + i * 10);
     tft_ST7735.print(timeStr);
   }
+}
+
+void clearTimerArea(int y, int height) {
+  tft_ST7735.fillRect(0, y, tft_ST7735.width(), height, ST77XX_BLACK);
 }
 
 void setup(void) {
@@ -338,11 +354,12 @@ void loop() {
     if (!isTimerRunning) {
       startTime = millis();
       isTimerRunning = true;
+      clearTimerArea(35, 20);  // Clear the entire 80-degree timer area
     }
     currentTime = (millis() - startTime) / 1000.0;
     
     // Display 80-degree timer (right-aligned)
-    printRightAligned(currentTime, tft_ST7735.width() - 90, 35, 85, ST77XX_WHITE);
+    printRightAligned(currentTime, 35, ST77XX_WHITE);
   } else if (isTimerRunning) {
     isTimerRunning = false;
     updateTopTimes(currentTime);
@@ -354,12 +371,13 @@ void loop() {
       wheelieStartTime = millis();
       isWheelieTimerRunning = true;
       lastWheelieEndTime = wheelieStartTime;
+      clearTimerArea(65, 20);  // Clear the entire wheelie timer area
     }
     
     wheelieCurrentTime = (millis() - wheelieStartTime) / 1000.0;
     
     // Display wheelie timer (right-aligned)
-    printRightAligned(wheelieCurrentTime, tft_ST7735.width() - 90, 65, 85, ST77XX_YELLOW);
+    printRightAligned(wheelieCurrentTime, 65, ST77XX_YELLOW);
   } else if (isWheelieTimerRunning) {
     isWheelieTimerRunning = false;
     updateTopWheelieTimes(wheelieCurrentTime);

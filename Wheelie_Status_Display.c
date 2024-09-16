@@ -75,6 +75,10 @@ bool isRiding = false;
 unsigned long totalWheelieTime = 0;
 unsigned long lastWheelieEndTime = 0;
 
+// Add this global variable at the top of the file
+unsigned long lastUpdateTime = 0;
+const unsigned long UPDATE_INTERVAL = 1000; // Update every 100 ms
+
 // Add this function to format the ride time
 String formatRideTime(unsigned long seconds) {
   int hours = seconds / 3600;
@@ -88,43 +92,49 @@ String formatRideTime(unsigned long seconds) {
 
 // Update this function to move the stopwatch and add wheelie percentage
 void updateRideTime() {
-  if (!isRiding) {
-    rideStartTime = millis();
-    isRiding = true;
-  }
-  
   unsigned long currentTime = millis();
-  unsigned long rideTime = (currentTime - rideStartTime) / 1000;
-  String timeStr = formatRideTime(rideTime);
   
-  // Update total wheelie time if currently in a wheelie
-  if (isWheelieTimerRunning) {
-    totalWheelieTime += currentTime - lastWheelieEndTime;
+  // Only update if the UPDATE_INTERVAL has passed
+  if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
+    lastUpdateTime = currentTime;
+
+    if (!isRiding) {
+      rideStartTime = currentTime;
+      isRiding = true;
+    }
+    
+    unsigned long rideTime = (currentTime - rideStartTime) / 1000;
+    String timeStr = formatRideTime(rideTime);
+    
+    // Update total wheelie time if currently in a wheelie
+    if (isWheelieTimerRunning) {
+      totalWheelieTime += currentTime - lastWheelieEndTime;
+    }
+    lastWheelieEndTime = currentTime;
+    
+    // Calculate wheelie percentage
+    float wheeliePercentage = (rideTime > 0) ? (float)totalWheelieTime / (rideTime * 10) : 0;
+    
+    // Display ride time (moved 15 pixels to the right)
+    tft_ST7735.fillRect(15, tft_ST7735.height() - 10, 70, 10, ST77XX_BLACK);
+    tft_ST7735.setTextColor(ST77XX_WHITE);
+    tft_ST7735.setTextSize(1);
+    tft_ST7735.setCursor(15, tft_ST7735.height() - 10);
+    tft_ST7735.print(timeStr);
+    
+    // Display wheelie percentage with dynamic decimal places
+    tft_ST7735.fillRect(85, tft_ST7735.height() - 10, 45, 10, ST77XX_BLACK);
+    tft_ST7735.setCursor(85, tft_ST7735.height() - 10);
+    
+    if (wheeliePercentage < 10) {
+      tft_ST7735.print(wheeliePercentage, 1);
+    } else if (wheeliePercentage < 100) {
+      tft_ST7735.print(wheeliePercentage, 1);
+    } else {
+      tft_ST7735.print(wheeliePercentage, 0);
+    }
+    tft_ST7735.print("%");
   }
-  lastWheelieEndTime = currentTime;
-  
-  // Calculate wheelie percentage
-  float wheeliePercentage = (rideTime > 0) ? (float)totalWheelieTime / (rideTime * 10) : 0;
-  
-  // Display ride time (moved 15 pixels to the right)
-  tft_ST7735.fillRect(15, tft_ST7735.height() - 10, 70, 10, ST77XX_BLACK);
-  tft_ST7735.setTextColor(ST77XX_WHITE);
-  tft_ST7735.setTextSize(1);
-  tft_ST7735.setCursor(15, tft_ST7735.height() - 10);
-  tft_ST7735.print(timeStr);
-  
-  // Display wheelie percentage with dynamic decimal places
-  tft_ST7735.fillRect(85, tft_ST7735.height() - 10, 45, 10, ST77XX_BLACK);
-  tft_ST7735.setCursor(85, tft_ST7735.height() - 10);
-  
-  if (wheeliePercentage < 10) {
-    tft_ST7735.print(wheeliePercentage, 1);
-  } else if (wheeliePercentage < 100) {
-    tft_ST7735.print(wheeliePercentage, 1);
-  } else {
-    tft_ST7735.print(wheeliePercentage, 0);
-  }
-  tft_ST7735.print("%");
 }
 
 // Add this helper function to format time
@@ -262,33 +272,17 @@ void setup(void) {
   tft_ST7735.drawRect(mainBarX, centerY - barHeight/2, mainBarWidth, barHeight, ST77XX_WHITE);
   tft_ST7735.drawRect(secondBarX, centerY - barHeight/2, secondBarWidth, barHeight, ST77XX_WHITE);
 
-  // Initialize ride start time
-  rideStartTime = millis();
-  isRiding = true;
-}
-
-
-void loop() {
-  float sumPitch = 0.0;
-  int iterations = 0;
-
   // Draw Libruh Logo
   tft_ST7735.drawCircle(8, 123, 2, ST77XX_WHITE);
   tft_ST7735.drawLine(LcenterX - crosshairSize, LcenterY, LcenterX + crosshairSize-3, LcenterY-12, ST7735_WHITE);
   tft_ST7735.drawLine(LcenterX - crosshairSize, LcenterY, LcenterX + crosshairSize, LcenterY, ST7735_WHITE);
 
-  while (iterations < 6) {
-    if (IMU.accelerationAvailable()) {
-      iterations++;
-      IMU.readAcceleration(x, y, z);
-      float rawPitch = atan2(-x, sqrt(y*y + z*z)) * 180.0 / PI;
-      pitch = rawPitch - mountAngle;
-      sumPitch += pitch;
-    }
-  }
-  
-  pitch = sumPitch / 6.0; // Average pitch over 6 readings
-  
+  // Initialize ride start time
+  rideStartTime = millis();
+  isRiding = true;
+}
+
+void updateVerticalBars() {
   // Map pitch to main bar height (0-75 degrees)
   int mainFillHeight = map(constrain(abs(pitch), 0, maxPitch), 0, maxPitch, 0, barHeight);
   int mainFillY = centerY + barHeight/2 - mainFillHeight;
@@ -333,8 +327,9 @@ void loop() {
   // Redraw bar outlines
   tft_ST7735.drawRect(mainBarX, centerY - barHeight/2, mainBarWidth, barHeight, ST77XX_WHITE);
   tft_ST7735.drawRect(secondBarX, centerY - barHeight/2, secondBarWidth, barHeight, ST77XX_WHITE);
-  
-  // Display pitch value
+}
+
+void displayPitchValue() {
   tft_ST7735.fillRect(10, 4, 60, 20, ST77XX_BLACK);  // Moved 10 pixels right and 2 pixels down
   tft_ST7735.setCursor(10, 4);  // Moved 10 pixels right and 2 pixels down
   tft_ST7735.setTextColor(ST77XX_WHITE);
@@ -348,7 +343,9 @@ void loop() {
   }
   tft_ST7735.print(abs(displayPitch));
   tft_ST7735.print((char)247); // Degree symbol
+}
 
+void handle80DegreeTimer() {
   // Handle 80-degree timer
   if (abs(pitch) >= 80) {
     if (!isTimerRunning) {
@@ -364,7 +361,9 @@ void loop() {
     isTimerRunning = false;
     updateTopTimes(currentTime);
   }
+}
 
+void handleWheelieTimer() {
   // Handle wheelie timer (pitch < -10 degrees)
   if (pitch < -10) {
     if (!isWheelieTimerRunning) {
@@ -383,7 +382,35 @@ void loop() {
     updateTopWheelieTimes(wheelieCurrentTime);
     totalWheelieTime += millis() - lastWheelieEndTime;
   }
+}
 
-  // Update and display ride time and wheelie percentage
+void loop() {
+  float sumPitch = 0.0;
+  int iterations = 0;
+
+  // Fast-updating elements (pitch, vertical bars, timers)
+  while (iterations < 6) {
+    if (IMU.accelerationAvailable()) {
+      iterations++;
+      IMU.readAcceleration(x, y, z);
+      float rawPitch = atan2(-x, sqrt(y*y + z*z)) * 180.0 / PI;
+      pitch = rawPitch - mountAngle;
+      sumPitch += pitch;
+    }
+  }
+  
+  pitch = sumPitch / 6.0; // Average pitch over 6 readings
+  
+  // Update vertical bars and pitch display
+  updateVerticalBars();
+  displayPitchValue();
+
+  // Handle 80-degree timer
+  handle80DegreeTimer();
+
+  // Handle wheelie timer
+  handleWheelieTimer();
+
+  // Slower-updating elements (stopwatch and wheelie percentage)
   updateRideTime();
 }
